@@ -1,10 +1,14 @@
-; Battery notification
+; Battery charge notification
 ;
 ; When the battery is charged, a notification
 ; will appear to tell the user to remove the charger
 ;
 ; When the battery is below 10%, a notification
 ; will appear to tell the user to plug in the charger
+;
+; Improvements 
+; - Allow the user to set both boundaries instead of being fixed. 
+;   * Read a config file at start up
 
 
 SetTitleMatchMode 2
@@ -16,55 +20,57 @@ sleepTime := 60
 
 Loop{ ;Loop forever
 
-;Grab the current data.
-VarSetCapacity(powerstatus, 1+1+1+1+4+4)
-success := DllCall("kernel32.dll\GetSystemPowerStatus", "uint", &powerstatus)
+	;Grab the current data.
+	VarSetCapacity(powerstatus, 1+1+1+1+4+4)
+	success := DllCall("kernel32.dll\GetSystemPowerStatus", "uint", &powerstatus)
 
-acLineStatus:=ReadInteger(&powerstatus,0)
-batteryLifePercent:=ReadInteger(&powerstatus,2)
+	acLineStatus:=ReadInteger(&powerstatus,0)			; Charger connected
+	batteryLifePercent:=ReadInteger(&powerstatus,2)		; Battery charge level
 
-;Is the battery charged higher than 99%
-if (batteryLifePercent > 99){ ;Yes. 
+	;Is the battery charged higher than 99%
+	if (batteryLifePercent > 99){ ; Yes. 
 
-	if (acLineStatus == 1){ ;Only notify me once
-		if (batteryLifePercent == 255){
-			sleepTime := 60
+		if (acLineStatus == 1){ ; Only alert if the power lead is connected
+			if (batteryLifePercent == 255){		; Battery is disconnected
+				sleepTime := 60
+			} else{
+				
+				; Alert user visually and audibly
+				output=UNPLUG THE CHARGING CABLE !!!`nBattery Life: %batteryLifePercent%%percentage%
+				SoundBeep, 1500, 200
+				MsgBox, %output%
+				
+				sleepTime := 5	; Short delay since the power lead is connected and the message box has been dismissed
 			}
+		}
 		else{
-			;Format the message box
-			output=UNPLUG THE CHARGING CABLE !!!`nBattery Life: %batteryLifePercent%%percentage%
-			SoundBeep, 1500, 200
-			MsgBox, %output% ;Notify me.
-			sleepTime := 5
+			sleepTime := 60		; Long delay since the battery should take a while to discharge
 		}
 	}
-	else{
-		sleepTime := 60
+
+	;Is the battery charged less than 10%
+	if (batteryLifePercent < 10){ ; Yes
+
+		if (acLineStatus == 0){ ; Only alert if the power lead is not connected
+			
+			; Alert user visually and audibly
+			output=PLUG IN THE CHARGING CABLE !!!`nBattery Life: %batteryLifePercent%%percentage%
+			SoundBeep, 1500, 200
+			MsgBox, %output%
+			
+			sleepTime := 5		; Short delay since the power lead is not connected and the message box has been dismissed
+		} else{
+			sleepTime := 60		; Long delay since the battery should take a while to charge
+		}
 	}
+
+
+	sleep, sleepTime*1000		; Delay in seconds
 }
 
-;Is the battery charged higher than 99%
-if (batteryLifePercent < 10){ ;Yes. 
-
-	if (acLineStatus == 0){ ;Only notify me once
-		;Format the message box
-		output=PLUG IN THE CHARGING CABLE !!!`nBattery Life: %batteryLifePercent%%percentage%
-		SoundBeep, 1500, 200
-		MsgBox, %output% ;Notify me.
-		sleepTime := 5
-	}
-	else{
-		sleepTime := 60
-	}
-}
-
-
-sleep, sleepTime*1000 ;sleep for 5 seconds
-}
 
 ;Format the data
-ReadInteger( p_address, p_offset)
-{
+ReadInteger( p_address, p_offset){
   loop, 1
 	value := 0+( *( ( p_address+p_offset )+( a_Index-1 ) ) << ( 8* ( a_Index-1 ) ) )
   return, value

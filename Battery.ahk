@@ -15,62 +15,56 @@ SetTitleMatchMode 2
 #SingleInstance ignore
 #NoTrayIcon
 
+
 percentage := "%"
-sleepTime := 60
+sleepTime := 60 * 1000 ; Delay in seconds
 
 Loop{ ;Loop forever
 
 	;Grab the current data.
-	VarSetCapacity(powerstatus, 1+1+1+1+4+4)
+	;https://docs.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-system_power_status
+	VarSetCapacity(powerstatus, 12) ;1+1+1+1+4+4
 	success := DllCall("kernel32.dll\GetSystemPowerStatus", "uint", &powerstatus)
 
-	acLineStatus:=ReadInteger(&powerstatus,0)			; Charger connected
-	batteryLifePercent:=ReadInteger(&powerstatus,2)		; Battery charge level
+	acLineStatus:=ExtractValue(&powerstatus,0)			; Charger connected
+	batteryChargePercent:=ExtractValue(&powerstatus,2)		; Battery charge level
 
 	;Is the battery charged higher than 99%
-	if (batteryLifePercent > 99){ ; Yes. 
+	if (batteryChargePercent > 99){ ; Yes. 
 
 		if (acLineStatus == 1){ ; Only alert if the power lead is connected
-			if (batteryLifePercent == 255){		; Battery is disconnected
-				sleepTime := 60
-			} else{
-				
-				; Alert user visually and audibly
-				output=UNPLUG THE CHARGING CABLE !!!`nBattery Life: %batteryLifePercent%%percentage%
-				SoundBeep, 1500, 200
-				MsgBox, %output%
-				
-				sleepTime := 5	; Short delay since the power lead is connected and the message box has been dismissed
+			if (batteryChargePercent != 255){		; and if the battery is not disconnected
+			
+				output=UNPLUG THE CHARGING CABLE !!!`nBattery Charge Level: %batteryChargePercent%%percentage%
+				notifyUser(output)
 			}
-		}
-		else{
-			sleepTime := 60		; Long delay since the battery should take a while to discharge
 		}
 	}
 
 	;Is the battery charged less than 10%
-	if (batteryLifePercent < 10){ ; Yes
+	if (batteryChargePercent < 10){ ; Yes
 
 		if (acLineStatus == 0){ ; Only alert if the power lead is not connected
 			
-			; Alert user visually and audibly
-			output=PLUG IN THE CHARGING CABLE !!!`nBattery Life: %batteryLifePercent%%percentage%
-			SoundBeep, 1500, 200
-			MsgBox, %output%
-			
-			sleepTime := 5		; Short delay since the power lead is not connected and the message box has been dismissed
-		} else{
-			sleepTime := 60		; Long delay since the battery should take a while to charge
+			output=PLUG IN THE CHARGING CABLE !!!`nBattery Charge Level: %batteryChargePercent%%percentage%
+			notifyUser(output)
 		}
 	}
 
 
-	sleep, sleepTime*1000		; Delay in seconds
+	sleep, sleepTime		
 }
 
 
-;Format the data
-ReadInteger( p_address, p_offset){
+; Alert user visually and audibly
+notifyUser(message){
+	SoundBeep, 1500, 200
+	MsgBox, %message%
+}
+
+
+;Format the value from the structure
+ExtractValue( p_address, p_offset){
   loop, 1
 	value := 0+( *( ( p_address+p_offset )+( a_Index-1 ) ) << ( 8* ( a_Index-1 ) ) )
   return, value
